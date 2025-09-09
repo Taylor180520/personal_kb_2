@@ -421,7 +421,9 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
     }
     
     setInputValue('');
-    setValidationError('');
+    
+  }
+}setValidationError('');
     setTimeout(focusInviteInputToEnd, 0);
   };
 
@@ -659,7 +661,7 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
                 {/* Validation Error */}
                 {validationError && (
                   <div className="text-red-500 dark:text-red-400 text-xs mt-1">{validationError}</div>
-                )}
+                )
               </div>
               
               {/* Invite Button - on the right side of search */}
@@ -959,7 +961,6 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
                   <div className="text-gray-500 dark:text-gray-400 text-sm">No suggestions available</div>
                   <div className="text-gray-400 dark:text-gray-500 text-xs mt-1">All members from your teams already have access</div>
                 </div>
-              )
               )}
             </div>
           ) : (
