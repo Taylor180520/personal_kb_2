@@ -659,7 +659,7 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
                 {/* Validation Error */}
                 {validationError && (
                   <div className="text-red-500 dark:text-red-400 text-xs mt-1">{validationError}</div>
-                )
+                )}
               </div>
               
               {/* Invite Button - on the right side of search */}
