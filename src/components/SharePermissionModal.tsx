@@ -256,29 +256,47 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
   // Search effect with proper dependencies
   useEffect(() => {
     if (searchQuery.trim()) {
+      const lowerCaseQuery = searchQuery.toLowerCase();
+      
       if (isInviteMode) {
-        // In invite mode, search from suggested users and groups
-        const suggestedUserResults = filteredSuggestedUsers.filter(user => 
-          user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          user.email.toLowerCase().includes(searchQuery.toLowerCase())
+        // In invite mode, search from both suggested and already invited users/groups
+        const suggestedUserResults = filteredSuggestedUsers.filter(user =>
+          user.name.toLowerCase().includes(lowerCaseQuery) ||
+          user.email.toLowerCase().includes(lowerCaseQuery)
         );
         const suggestedGroupResults = filteredSuggestedGroups.filter(group =>
-          group.name.toLowerCase().includes(searchQuery.toLowerCase())
+          group.name.toLowerCase().includes(lowerCaseQuery)
         );
-        setSearchResults([...suggestedUserResults, ...suggestedGroupResults]);
+        
+        // Also search from already invited users and groups
+        const invitedUserResults = users.filter(user =>
+          user.name.toLowerCase().includes(lowerCaseQuery) ||
+          user.email.toLowerCase().includes(lowerCaseQuery)
+        );
+        const invitedGroupResults = roleGroups.filter(group =>
+          group.name.toLowerCase().includes(lowerCaseQuery)
+        );
+        
+        // Combine all results
+        setSearchResults([...suggestedUserResults, ...suggestedGroupResults, ...invitedUserResults, ...invitedGroupResults]);
       } else {
         // In share mode, search from existing users and groups
         const userResults = users.filter(user => 
-          user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          user.email.toLowerCase().includes(searchQuery.toLowerCase())
+          user.name.toLowerCase().includes(lowerCaseQuery) ||
+          user.email.toLowerCase().includes(lowerCaseQuery)
         );
         const groupResults = roleGroups.filter(group =>
-          group.name.toLowerCase().includes(searchQuery.toLowerCase())
+          group.name.toLowerCase().includes(lowerCaseQuery)
         );
         setSearchResults([...userResults, ...groupResults]);
       }
     } else {
-      setSearchResults([]);
+      if (isInviteMode) {
+        // When not searching in invite mode, show suggested users and groups
+        setSearchResults([...filteredSuggestedUsers, ...filteredSuggestedGroups]);
+      } else {
+        setSearchResults([]);
+      }
     }
   }, [searchQuery, users, roleGroups, isInviteMode, filteredSuggestedUsers, filteredSuggestedGroups]);
 
@@ -620,16 +638,25 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
                     <div className="grid grid-cols-1 gap-1">
                       {searchResults.map((result) => {
                         const isSelected = inviteTags.some(tag => tag.id === result.id);
+                        const isInvitedUser = 'email' in result && users.some(u => u.id === result.id);
+                        const isInvitedGroup = !('email' in result) && roleGroups.some(g => g.id === result.id);
+                        const isAlreadyInvited = isInvitedUser || isInvitedGroup;
+                        
                         return (
                           <div 
                             key={result.id} 
-                            className="flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg cursor-pointer transition-colors"
-                            onClick={() => {
+                            className={`flex items-center justify-between p-4 rounded-lg transition-colors ${
+                              isAlreadyInvited 
+                                ? 'bg-gray-50 dark:bg-gray-700/50' 
+                                : 'hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer'
+                            }`}
+                            onClick={isAlreadyInvited ? undefined : () => {
                               addSuggestedToTags(result);
                               setSearchQuery('');
                               setInputValue('');
                               setValidationError('');
                             }}
+                            style={isAlreadyInvited ? { cursor: 'default' } : undefined}
                           >
                             <div className="flex items-center gap-3 flex-1 min-w-0">
                               {'email' in result ? (
@@ -655,7 +682,30 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
                               )}
                             </div>
                             <div className="flex-shrink-0 ml-3">
-                              {isSelected ? (
+                              {isAlreadyInvited ? (
+                                <select
+                                  value={result.permission}
+                                  onChange={(e) => {
+                                    const newPermission = e.target.value as PermissionOption;
+                                    if ('email' in result) {
+                                      handlePermissionChange(result.id, newPermission);
+                                    } else {
+                                      if (newPermission === 'Revoke') {
+                                        setRoleGroups(prev => prev.filter(g => g.id !== result.id));
+                                      } else {
+                                        handleGroupPermissionChange(result.id, newPermission as RoleGroup['permission']);
+                                      }
+                                    }
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-600 focus:outline-none"
+                                >
+                                  <option value="View-only">View-only</option>
+                                  <option value="Can edit">Can edit</option>
+                                  <option value="Full access">Full access</option>
+                                  <option value="Revoke" className="text-red-600">Revoke</option>
+                                </select>
+                              ) : isSelected ? (
                                 <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
                                   <Check size={14} className="text-white" />
                                 </div>
@@ -676,60 +726,42 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
                 )
               ) : (
                 // Show suggested content when not searching
-                (filteredSuggestedUsers.length > 0 || filteredSuggestedGroups.length > 0) ? (
+                searchResults.length > 0 ? (
                 <div className="space-y-1">
                   <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Suggested</h3>
                   
                   {/* Grid layout for better space utilization */}
                   <div className="grid grid-cols-1 gap-1">
-                    {/* Suggested Users */}
-                    {filteredSuggestedUsers.map((user) => {
-                      const isSelected = inviteTags.some(tag => tag.id === user.id);
+                    {searchResults.map((result) => {
+                      const isSelected = inviteTags.some(tag => tag.id === result.id);
                       return (
                         <div 
-                          key={user.id} 
+                          key={result.id} 
                           className="flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg cursor-pointer transition-colors"
-                          onClick={() => addSuggestedToTags(user)}
+                          onClick={() => addSuggestedToTags(result)}
                         >
                           <div className="flex items-center gap-3 flex-1 min-w-0">
-                            <div className="w-10 h-10 bg-gray-200 dark:bg-gray-600 rounded-full flex items-center justify-center text-sm font-semibold text-gray-700 dark:text-gray-300 flex-shrink-0">
-                              {user.name.charAt(0).toUpperCase()}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="text-sm font-medium text-gray-900 dark:text-white truncate">{user.name}</div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400 truncate">{user.email}</div>
-                            </div>
-                          </div>
-                          <div className="flex-shrink-0 ml-3">
-                            {isSelected ? (
-                              <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
-                                <Check size={14} className="text-white" />
-                              </div>
+                            {'email' in result ? (
+                              <>
+                                <div className="w-10 h-10 bg-gray-200 dark:bg-gray-600 rounded-full flex items-center justify-center text-sm font-semibold text-gray-700 dark:text-gray-300 flex-shrink-0">
+                                  {result.name.charAt(0).toUpperCase()}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <div className="text-sm font-medium text-gray-900 dark:text-white truncate">{result.name}</div>
+                                  <div className="text-xs text-gray-500 dark:text-gray-400 truncate">{result.email}</div>
+                                </div>
+                              </>
                             ) : (
-                              <div className="w-6 h-6 border-2 border-gray-300 dark:border-gray-500 rounded-full"></div>
+                              <>
+                                <div className="w-10 h-10 bg-gray-200 dark:bg-gray-600 rounded-full flex items-center justify-center flex-shrink-0">
+                                  <Users size={16} className="text-gray-600 dark:text-gray-400" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <div className="text-sm font-medium text-gray-900 dark:text-white truncate">{result.name}</div>
+                                  <div className="text-xs text-gray-500 dark:text-gray-400">Group • {result.memberCount} person{result.memberCount !== 1 ? 's' : ''}</div>
+                                </div>
+                              </>
                             )}
-                          </div>
-                        </div>
-                      );
-                    })}
-
-                    {/* Suggested Role Groups */}
-                    {filteredSuggestedGroups.map((group) => {
-                      const isSelected = inviteTags.some(tag => tag.id === group.id);
-                      return (
-                        <div 
-                          key={group.id} 
-                          className="flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg cursor-pointer transition-colors"
-                          onClick={() => addSuggestedToTags(group)}
-                        >
-                          <div className="flex items-center gap-3 flex-1 min-w-0">
-                            <div className="w-10 h-10 bg-gray-200 dark:bg-gray-600 rounded-full flex items-center justify-center flex-shrink-0">
-                              <Users size={16} className="text-gray-600 dark:text-gray-400" />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="text-sm font-medium text-gray-900 dark:text-white truncate">{group.name}</div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400">Group • {group.memberCount} person{group.memberCount !== 1 ? 's' : ''}</div>
-                            </div>
                           </div>
                           <div className="flex-shrink-0 ml-3">
                             {isSelected ? (
@@ -871,4 +903,4 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
   );
 };
 
-export default SharePermissionModal; 
+export default SharePermissionModal;
