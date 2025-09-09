@@ -733,6 +733,7 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
                                   </div>
                                   <div className="min-w-0 flex-1">
                                     <div className="text-sm font-medium text-gray-900 dark:text-white truncate">"{result.email}"</div>
+                                    <div className="text-xs text-gray-500 dark:text-gray-400">External user</div>
                                   </div>
                                 </>
                               ) : 'email' in result ? (
@@ -834,6 +835,7 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
                                   <UserPlus size={16} className="text-blue-600 dark:text-blue-400" />
                                 </div>
                                 <div className="min-w-0 flex-1">
+                                  <div className="text-sm font-medium text-gray-900 dark:text-white truncate">"{result.email}"</div>
                                 </div>
                               </>
                             ) : 'email' in result ? (
