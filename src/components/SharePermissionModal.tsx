@@ -502,36 +502,6 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
                 />
                 
                 {/* Search Results Dropdown */}
-                {showSearchResults && searchResults.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg z-10 max-h-48 overflow-y-auto">
-                    {searchResults.map((result) => (
-                      <div 
-                        key={result.id}
-                        className="p-3 hover:bg-gray-50 dark:hover:bg-gray-600 cursor-pointer border-b border-gray-100 dark:border-gray-600 last:border-b-0"
-                      >
-                        {'email' in result ? (
-                          <div className="flex items-center gap-3">
-                            <img src={result.avatar} alt={result.name} className="w-8 h-8 rounded-full" />
-                            <div>
-                              <div className="text-sm font-medium text-gray-900 dark:text-white">{result.name}</div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400">{result.email}</div>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900/40 rounded-full flex items-center justify-center">
-                              <Users size={16} className="text-purple-600 dark:text-purple-400" />
-                            </div>
-                            <div>
-                              <div className="text-sm font-medium text-gray-900 dark:text-white">{result.name}</div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400">{result.memberCount} members</div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
               <button 
                 onClick={handleInviteClick}
