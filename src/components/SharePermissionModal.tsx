@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Search, X, ExternalLink, ChevronDown, ChevronRight, Users, ArrowLeft, UserPlus, Check, ChevronDown as ChevronDownIcon } from 'lucide-react';
+import { Search, X, ExternalLink, ChevronDown, ChevronRight, Users, ArrowLeft, UserPlus, Check, ChevronDown as ChevronDownIcon, ArrowRight, User } from 'lucide-react';
 
 interface User {
   id: string;
@@ -19,6 +19,13 @@ interface RoleGroup {
   permission: 'View-only' | 'Can edit' | 'Full access';
   addedAt: Date;
   members: User[];
+}
+
+interface ExternalUser {
+  id: string;
+  email: string;
+  name: string;
+  type: 'external';
 }
 
 interface SharePermissionModalProps {
@@ -117,7 +124,7 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
     }
   ]);
 
-  const [searchResults, setSearchResults] = useState<(User | RoleGroup)[]>([]);
+  const [searchResults, setSearchResults] = useState<(User | RoleGroup | ExternalUser)[]>([]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -290,6 +297,26 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
         );
         setSearchResults([...userResults, ...groupResults]);
       }
+      
+      // Check if the search query is a valid email that's not already in results
+      const trimmedQuery = searchQuery.trim();
+      if (isInviteMode && isValidEmail(trimmedQuery)) {
+        const emailExists = [
+          ...suggestedUsers,
+          ...users,
+          ...inviteTags.filter(tag => tag.email)
+        ].some(item => item.email?.toLowerCase() === trimmedQuery.toLowerCase());
+        
+        if (!emailExists) {
+          const externalUser: ExternalUser = {
+            id: `external-${trimmedQuery}`,
+            email: trimmedQuery,
+            name: trimmedQuery,
+            type: 'external'
+          };
+          setSearchResults(prev => [...prev, externalUser]);
+        }
+      }
     } else {
       if (isInviteMode) {
         // When not searching in invite mode, show suggested users and groups
@@ -407,6 +434,19 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
       };
       setInviteTags(prev => [...prev, newTag]);
     }
+    setTimeout(focusInviteInputToEnd, 0);
+  };
+
+  const addExternalUserToTags = (externalUser: ExternalUser) => {
+    const newTag = {
+      id: externalUser.id,
+      name: externalUser.email,
+      type: 'user' as const,
+      email: externalUser.email
+    };
+    setInviteTags(prev => [...prev, newTag]);
+    setSearchQuery('');
+    setInputValue('');
     setTimeout(focusInviteInputToEnd, 0);
   };
 
@@ -620,6 +660,24 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
             </div>
             
 
+            {/* Keep typing an email to invite hint */}
+            {searchQuery.trim() && isValidEmail(searchQuery.trim()) && (
+              (() => {
+                const trimmedQuery = searchQuery.trim();
+                const emailExists = [
+                  ...suggestedUsers,
+                  ...users,
+                  ...inviteTags.filter(tag => tag.email)
+                ].some(item => item.email?.toLowerCase() === trimmedQuery.toLowerCase());
+                
+                return !emailExists ? (
+                  <div className="px-6 pb-4">
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Keep typing an email to invite</p>
+                  </div>
+                ) : null;
+              })()
+            )}
+
           </div>
         )}
 
@@ -638,20 +696,25 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
                     <div className="grid grid-cols-1 gap-1">
                       {searchResults.map((result) => {
                         const isSelected = inviteTags.some(tag => tag.id === result.id);
-                        const isInvitedUser = 'email' in result && users.some(u => u.id === result.id);
-                        const isInvitedGroup = !('email' in result) && roleGroups.some(g => g.id === result.id);
+                        const isInvitedUser = 'email' in result && result.type !== 'external' && users.some(u => u.id === result.id);
+                        const isInvitedGroup = !('email' in result) && result.type !== 'external' && roleGroups.some(g => g.id === result.id);
                         const isAlreadyInvited = isInvitedUser || isInvitedGroup;
+                        const isExternal = 'type' in result && result.type === 'external';
                         
                         return (
                           <div 
                             key={result.id} 
                             className={`flex items-center justify-between p-4 rounded-lg transition-colors ${
-                              isAlreadyInvited 
+                              isAlreadyInvited
                                 ? 'bg-gray-50 dark:bg-gray-700/50' 
                                 : 'hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer'
                             }`}
                             onClick={isAlreadyInvited ? undefined : () => {
-                              addSuggestedToTags(result);
+                              if (isExternal) {
+                                addExternalUserToTags(result as ExternalUser);
+                              } else {
+                                addSuggestedToTags(result as User | RoleGroup);
+                              }
                               setSearchQuery('');
                               setInputValue('');
                               setValidationError('');
@@ -659,7 +722,17 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
                             style={isAlreadyInvited ? { cursor: 'default' } : undefined}
                           >
                             <div className="flex items-center gap-3 flex-1 min-w-0">
-                              {'email' in result ? (
+                              {isExternal ? (
+                                <>
+                                  <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/40 rounded-full flex items-center justify-center flex-shrink-0">
+                                    <User size={16} className="text-blue-600 dark:text-blue-400" />
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="text-sm font-medium text-gray-900 dark:text-white truncate">"{result.email}"</div>
+                                    <div className="text-xs text-gray-500 dark:text-gray-400">External user</div>
+                                  </div>
+                                </>
+                              ) : 'email' in result ? (
                                 <>
                                   <div className="w-10 h-10 bg-gray-200 dark:bg-gray-600 rounded-full flex items-center justify-center text-sm font-semibold text-gray-700 dark:text-gray-300 flex-shrink-0">
                                     {result.name.charAt(0).toUpperCase()}
@@ -705,6 +778,10 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
                                   <option value="Full access">Full access</option>
                                   <option value="Revoke" className="text-red-600">Revoke</option>
                                 </select>
+                              ) : isExternal ? (
+                                <div className="w-6 h-6 text-gray-400 dark:text-gray-500 flex items-center justify-center">
+                                  <ArrowRight size={16} />
+                                </div>
                               ) : isSelected ? (
                                 <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
                                   <Check size={14} className="text-white" />
@@ -734,14 +811,31 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
                   <div className="grid grid-cols-1 gap-1">
                     {searchResults.map((result) => {
                       const isSelected = inviteTags.some(tag => tag.id === result.id);
+                      const isExternal = 'type' in result && result.type === 'external';
                       return (
                         <div 
                           key={result.id} 
                           className="flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg cursor-pointer transition-colors"
-                          onClick={() => addSuggestedToTags(result)}
+                          onClick={() => {
+                            if (isExternal) {
+                              addExternalUserToTags(result as ExternalUser);
+                            } else {
+                              addSuggestedToTags(result as User | RoleGroup);
+                            }
+                          }}
                         >
                           <div className="flex items-center gap-3 flex-1 min-w-0">
-                            {'email' in result ? (
+                            {isExternal ? (
+                              <>
+                                <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/40 rounded-full flex items-center justify-center flex-shrink-0">
+                                  <User size={16} className="text-blue-600 dark:text-blue-400" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <div className="text-sm font-medium text-gray-900 dark:text-white truncate">"{result.email}"</div>
+                                  <div className="text-xs text-gray-500 dark:text-gray-400">External user</div>
+                                </div>
+                              </>
+                            ) : 'email' in result ? (
                               <>
                                 <div className="w-10 h-10 bg-gray-200 dark:bg-gray-600 rounded-full flex items-center justify-center text-sm font-semibold text-gray-700 dark:text-gray-300 flex-shrink-0">
                                   {result.name.charAt(0).toUpperCase()}
@@ -764,7 +858,11 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
                             )}
                           </div>
                           <div className="flex-shrink-0 ml-3">
-                            {isSelected ? (
+                            {isExternal ? (
+                              <div className="w-6 h-6 text-gray-400 dark:text-gray-500 flex items-center justify-center">
+                                <ArrowRight size={16} />
+                              </div>
+                            ) : isSelected ? (
                               <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
                                 <Check size={14} className="text-white" />
                               </div>
