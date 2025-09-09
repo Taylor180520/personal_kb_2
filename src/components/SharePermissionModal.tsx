@@ -290,11 +290,11 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
         // Combine internal matches
         const allMatches = [...invitedUserResults, ...invitedGroupResults, ...suggestedUserResults, ...suggestedGroupResults];
         
-        // If no matches found and the input looks like it could be an external user
+        // If no matches found, show external user option
         const trimmedQuery = searchQuery.trim();
         
-        // Check if this could be an external user (valid email format)
-        if (allMatches.length === 0 && trimmedQuery.length > 0 && isValidEmail(trimmedQuery)) {
+        // Show external user option when no internal matches and query is not empty
+        if (allMatches.length === 0 && trimmedQuery.length > 0) {
           // Check if it's not already in invite tags
           const alreadyInTags = inviteTags.some(tag => 
             tag.email?.toLowerCase() === trimmedQuery.toLowerCase() ||
@@ -302,7 +302,7 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
           );
           
           if (!alreadyInTags) {
-            // Create external user entry
+            // Create external user entry (no email validation here)
             const externalUser: ExternalUser = {
               id: `external-${trimmedQuery}`,
               email: trimmedQuery,
@@ -453,6 +453,12 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
   };
 
   const addExternalUserToTags = (externalUser: ExternalUser) => {
+    // Validate email when user clicks to add
+    if (!isValidEmail(externalUser.email)) {
+      setValidationError('This is not a valid email');
+      return;
+    }
+    
     const newTag = {
       id: externalUser.id,
       name: externalUser.email,
@@ -462,6 +468,7 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
     setInviteTags(prev => [...prev, newTag]);
     setSearchQuery('');
     setInputValue('');
+    setValidationError(''); // Clear any previous validation error
     setTimeout(focusInviteInputToEnd, 0);
   };
 
@@ -670,25 +677,6 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
                 Invite
               </button>
             </div>
-            
-
-            {/* Keep typing an email to invite hint */}
-            {searchQuery.trim() && isValidEmail(searchQuery.trim()) && (
-              (() => {
-                const trimmedQuery = searchQuery.trim();
-                const emailExists = [
-                  ...suggestedUsers,
-                  ...users,
-                  ...inviteTags.filter(tag => tag.email)
-                ].some(item => item.email?.toLowerCase() === trimmedQuery.toLowerCase());
-                
-                return !emailExists ? (
-                  <div className="px-6 pb-4">
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Keep typing an email to invite</p>
-                  </div>
-                ) : null;
-              })()
-            )}
 
           </div>
         )}
