@@ -285,7 +285,34 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
         );
         
         // Combine all results
-        setSearchResults([...suggestedUserResults, ...suggestedGroupResults, ...invitedUserResults, ...invitedGroupResults]);
+        const allMatches = [...suggestedUserResults, ...suggestedGroupResults, ...invitedUserResults, ...invitedGroupResults];
+        
+        // If no matches found and the input looks like it could be an external user
+        const trimmedQuery = searchQuery.trim();
+        
+        // Check if this could be an external user (email or potential username)
+        if (allMatches.length === 0 && trimmedQuery.length > 0) {
+          // Check if it's not already in invite tags
+          const alreadyInTags = inviteTags.some(tag => 
+            tag.email?.toLowerCase() === trimmedQuery.toLowerCase() ||
+            tag.name.toLowerCase() === trimmedQuery.toLowerCase()
+          );
+          
+          if (!alreadyInTags) {
+            // Create external user entry
+            const externalUser: ExternalUser = {
+              id: `external-${trimmedQuery}`,
+              email: trimmedQuery,
+              name: trimmedQuery,
+              type: 'external'
+            };
+            setSearchResults([externalUser]);
+          } else {
+            setSearchResults([]);
+          }
+        } else {
+          setSearchResults(allMatches);
+        }
       } else {
         // In share mode, search from existing users and groups
         const userResults = users.filter(user => 
@@ -296,33 +323,6 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
           group.name.toLowerCase().includes(lowerCaseQuery)
         );
         setSearchResults([...userResults, ...groupResults]);
-      const allMatches = [...suggestedUserResults, ...suggestedGroupResults, ...invitedUserResults, ...invitedGroupResults];
-      
-      // If no matches found and the input looks like it could be an external user
-      const trimmedQuery = searchQuery.trim();
-      
-      // Check if this could be an external user (email or potential username)
-      if (allMatches.length === 0 && trimmedQuery.length > 0) {
-        // Check if it's not already in invite tags
-        const alreadyInTags = inviteTags.some(tag => 
-          tag.email?.toLowerCase() === trimmedQuery.toLowerCase() ||
-          tag.name.toLowerCase() === trimmedQuery.toLowerCase()
-        );
-        
-        if (!alreadyInTags) {
-          // Create external user entry
-          const externalUser: ExternalUser = {
-            id: `external-${trimmedQuery}`,
-            email: trimmedQuery,
-            name: trimmedQuery,
-            type: 'external'
-          };
-          setSearchResults([externalUser]);
-        } else {
-          setSearchResults([]);
-        }
-      } else {
-        setSearchResults(allMatches);
       }
     } else {
       if (isInviteMode) {
@@ -332,7 +332,7 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
         setSearchResults([]);
       }
     }
-  }, [searchQuery, users, roleGroups, isInviteMode, filteredSuggestedUsers, filteredSuggestedGroups]);
+  }, [searchQuery, users, roleGroups, isInviteMode, filteredSuggestedUsers, filteredSuggestedGroups, inviteTags]);
 
   // Email validation function
   const isValidEmail = (email: string) => {
@@ -491,9 +491,9 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
     setValidationError('');
     setIsInviteMode(false);
     // success feedback via global callback
-    if (typeof onInviteSuccess === 'function') {
-      onInviteSuccess();
-    }
+    // if (typeof onInviteSuccess === 'function') {
+    //   onInviteSuccess();
+    // }
     
     // Here you would also send email notifications
     console.log('Sending email notifications to:', inviteTags);
