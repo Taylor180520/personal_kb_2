@@ -118,7 +118,6 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
   ]);
 
   const [searchResults, setSearchResults] = useState<(User | RoleGroup)[]>([]);
-  const [showSearchResults, setShowSearchResults] = useState(false);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -267,7 +266,6 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
           group.name.toLowerCase().includes(searchQuery.toLowerCase())
         );
         setSearchResults([...suggestedUserResults, ...suggestedGroupResults]);
-        setShowSearchResults(true);
       } else {
         // In share mode, search from existing users and groups
         const userResults = users.filter(user => 
@@ -278,10 +276,9 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
           group.name.toLowerCase().includes(searchQuery.toLowerCase())
         );
         setSearchResults([...userResults, ...groupResults]);
-        setShowSearchResults(true);
       }
     } else {
-      setShowSearchResults(false);
+      setSearchResults([]);
     }
   }, [searchQuery, users, roleGroups, isInviteMode, filteredSuggestedUsers, filteredSuggestedGroups]);
 
@@ -307,7 +304,6 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
     setInputValue('');
     setInviteTags([]);
     setValidationError('');
-    setShowSearchResults(false);
   };
 
   const handleBackToShare = () => {
@@ -316,7 +312,6 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
     setInputValue('');
     setInviteTags([]);
     setValidationError('');
-    setShowSearchResults(false);
   };
 
   const handleInputKeyDown = (e: React.KeyboardEvent) => {
@@ -625,51 +620,6 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
                 {validationError && (
                   <div className="text-red-500 dark:text-red-400 text-xs mt-1">{validationError}</div>
                 )}
-              
-                              {/* Search Results Dropdown for Invite Mode */}
-                {showSearchResults && searchResults.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg z-10 max-h-48 overflow-y-auto">
-                    {searchResults.map((result) => (
-                      <div 
-                        key={result.id}
-                        className="p-3 hover:bg-gray-50 dark:hover:bg-gray-600 cursor-pointer transition-colors"
-                        onClick={() => {
-                          addSuggestedToTags(result);
-                          setSearchQuery('');
-                          setInputValue('');
-                          setValidationError('');
-                          setShowSearchResults(false);
-                        }}
-                      >
-                        {'email' in result ? (
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3 flex-1 min-w-0">
-                              <img src={result.avatar} alt={result.name} className="w-8 h-8 rounded-full flex-shrink-0" />
-                              <div className="min-w-0 flex-1">
-                                <div className="text-sm font-medium text-gray-900 dark:text-white truncate">{result.name}</div>
-                                <div className="text-xs text-gray-500 dark:text-gray-400 truncate">{result.email}</div>
-                              </div>
-                            </div>
-                            <UserPlus size={16} className="text-purple-600 dark:text-purple-400 flex-shrink-0 ml-3" />
-                          </div>
-                        ) : (
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3 flex-1 min-w-0">
-                              <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900/40 rounded-full flex items-center justify-center flex-shrink-0">
-                                <Users size={16} className="text-purple-600 dark:text-purple-400" />
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <div className="text-sm font-medium text-gray-900 dark:text-white truncate">{result.name}</div>
-                                <div className="text-xs text-gray-500 dark:text-gray-400">{result.memberCount} members</div>
-                              </div>
-                            </div>
-                            <UserPlus size={16} className="text-purple-600 dark:text-purple-400 flex-shrink-0 ml-3" />
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
               
               {/* Invite Button - on the right side of search */}
@@ -690,7 +640,73 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
           {isInviteMode ? (
             // Suggested Content for Invite Mode
             <div className="p-6 pt-0">
-              {(filteredSuggestedUsers.length > 0 || filteredSuggestedGroups.length > 0) ? (
+              {searchQuery.trim() ? (
+                // Show search results when user is searching
+                searchResults.length > 0 ? (
+                  <div className="space-y-1">
+                    <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Search Results</h3>
+                    
+                    {/* Grid layout for better space utilization */}
+                    <div className="grid grid-cols-1 gap-1">
+                      {searchResults.map((result) => {
+                        const isSelected = inviteTags.some(tag => tag.id === result.id);
+                        return (
+                          <div 
+                            key={result.id} 
+                            className="flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg cursor-pointer transition-colors"
+                            onClick={() => {
+                              addSuggestedToTags(result);
+                              setSearchQuery('');
+                              setInputValue('');
+                              setValidationError('');
+                            }}
+                          >
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              {'email' in result ? (
+                                <>
+                                  <div className="w-10 h-10 bg-gray-200 dark:bg-gray-600 rounded-full flex items-center justify-center text-sm font-semibold text-gray-700 dark:text-gray-300 flex-shrink-0">
+                                    {result.name.charAt(0).toUpperCase()}
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="text-sm font-medium text-gray-900 dark:text-white truncate">{result.name}</div>
+                                    <div className="text-xs text-gray-500 dark:text-gray-400 truncate">{result.email}</div>
+                                  </div>
+                                </>
+                              ) : (
+                                <>
+                                  <div className="w-10 h-10 bg-gray-200 dark:bg-gray-600 rounded-full flex items-center justify-center flex-shrink-0">
+                                    <Users size={16} className="text-gray-600 dark:text-gray-400" />
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="text-sm font-medium text-gray-900 dark:text-white truncate">{result.name}</div>
+                                    <div className="text-xs text-gray-500 dark:text-gray-400">Group • {result.memberCount} person{result.memberCount !== 1 ? 's' : ''}</div>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                            <div className="flex-shrink-0 ml-3">
+                              {isSelected ? (
+                                <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                                  <Check size={14} className="text-white" />
+                                </div>
+                              ) : (
+                                <div className="w-6 h-6 border-2 border-gray-300 dark:border-gray-500 rounded-full"></div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <div className="text-gray-500 dark:text-gray-400 text-sm">No matching users or groups found</div>
+                    <div className="text-gray-400 dark:text-gray-500 text-xs mt-1">Try adjusting your search terms</div>
+                  </div>
+                )
+              ) : (
+                // Show suggested content when not searching
+                (filteredSuggestedUsers.length > 0 || filteredSuggestedGroups.length > 0) ? (
                 <div className="space-y-1">
                   <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Suggested</h3>
                   
@@ -764,6 +780,7 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
                   <div className="text-gray-500 dark:text-gray-400 text-sm">No suggestions available</div>
                   <div className="text-gray-400 dark:text-gray-500 text-xs mt-1">All members from your teams already have access</div>
                 </div>
+              )}
               )}
             </div>
           ) : (
