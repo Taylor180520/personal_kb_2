@@ -502,6 +502,7 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
                 />
                 
                 {/* Search Results Dropdown */}
+              </div>
               <button 
                 onClick={handleInviteClick}
                 className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors text-sm"
