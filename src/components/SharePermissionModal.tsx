@@ -26,6 +26,7 @@ interface ExternalUser {
   email: string;
   name: string;
   type: 'external';
+  category?: 'invited' | 'suggested' | 'external';
 }
 
 interface SharePermissionModalProps {
@@ -266,32 +267,34 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
       const lowerCaseQuery = searchQuery.toLowerCase();
       
       if (isInviteMode) {
-        // In invite mode, search from both suggested and already invited users/groups
-        const suggestedUserResults = filteredSuggestedUsers.filter(user =>
-          user.name.toLowerCase().includes(lowerCaseQuery) ||
-          user.email.toLowerCase().includes(lowerCaseQuery)
-        );
-        const suggestedGroupResults = filteredSuggestedGroups.filter(group =>
-          group.name.toLowerCase().includes(lowerCaseQuery)
-        );
-        
-        // Also search from already invited users and groups
+        // Search from already invited users and groups (Already Invited)
         const invitedUserResults = users.filter(user =>
           user.name.toLowerCase().includes(lowerCaseQuery) ||
           user.email.toLowerCase().includes(lowerCaseQuery)
-        );
+        ).map(user => ({ ...user, category: 'invited' as const }));
+        
         const invitedGroupResults = roleGroups.filter(group =>
           group.name.toLowerCase().includes(lowerCaseQuery)
-        );
+        ).map(group => ({ ...group, category: 'invited' as const }));
         
-        // Combine all results
-        const allMatches = [...suggestedUserResults, ...suggestedGroupResults, ...invitedUserResults, ...invitedGroupResults];
+        // Search from suggested users and groups (To be invited)
+        const suggestedUserResults = filteredSuggestedUsers.filter(user =>
+          user.name.toLowerCase().includes(lowerCaseQuery) ||
+          user.email.toLowerCase().includes(lowerCaseQuery)
+        ).map(user => ({ ...user, category: 'suggested' as const }));
+        
+        const suggestedGroupResults = filteredSuggestedGroups.filter(group =>
+          group.name.toLowerCase().includes(lowerCaseQuery)
+        ).map(group => ({ ...group, category: 'suggested' as const }));
+        
+        // Combine internal matches
+        const allMatches = [...invitedUserResults, ...invitedGroupResults, ...suggestedUserResults, ...suggestedGroupResults];
         
         // If no matches found and the input looks like it could be an external user
         const trimmedQuery = searchQuery.trim();
         
-        // Check if this could be an external user (email or potential username)
-        if (allMatches.length === 0 && trimmedQuery.length > 0) {
+        // Check if this could be an external user (valid email format)
+        if (allMatches.length === 0 && trimmedQuery.length > 0 && isValidEmail(trimmedQuery)) {
           // Check if it's not already in invite tags
           const alreadyInTags = inviteTags.some(tag => 
             tag.email?.toLowerCase() === trimmedQuery.toLowerCase() ||
@@ -304,7 +307,8 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
               id: `external-${trimmedQuery}`,
               email: trimmedQuery,
               name: trimmedQuery,
-              type: 'external'
+              type: 'external',
+              category: 'external'
             };
             setSearchResults([externalUser]);
           } else {
@@ -327,7 +331,11 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
     } else {
       if (isInviteMode) {
         // When not searching in invite mode, show suggested users and groups
-        setSearchResults([...filteredSuggestedUsers, ...filteredSuggestedGroups]);
+        const suggestedResults = [
+          ...filteredSuggestedUsers.map(user => ({ ...user, category: 'suggested' as const })),
+          ...filteredSuggestedGroups.map(group => ({ ...group, category: 'suggested' as const }))
+        ];
+        setSearchResults(suggestedResults);
       } else {
         setSearchResults([]);
       }
@@ -693,112 +701,179 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
               {searchQuery.trim() ? (
                 // Show search results when user is searching
                 searchResults.length > 0 ? (
-                  <div className="space-y-1">
-                    <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Search Results</h3>
-                    
-                    {/* Grid layout for better space utilization */}
-                    <div className="grid grid-cols-1 gap-1">
-                      {searchResults.map((result) => {
-                        const isSelected = inviteTags.some(tag => tag.id === result.id);
-                        const isInvitedUser = 'email' in result && result.type !== 'external' && users.some(u => u.id === result.id);
-                        const isInvitedGroup = !('email' in result) && result.type !== 'external' && roleGroups.some(g => g.id === result.id);
-                        const isAlreadyInvited = isInvitedUser || isInvitedGroup;
-                        const isExternal = 'type' in result && result.type === 'external';
-                        
-                        return (
-                          <div 
-                            key={result.id} 
-                            className={`flex items-center justify-between p-4 rounded-lg transition-colors ${
-                              isAlreadyInvited
-                                ? 'bg-gray-50 dark:bg-gray-700/50' 
-                                : 'hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer'
-                            }`}
-                            onClick={isAlreadyInvited ? undefined : () => {
-                              if (isExternal) {
-                                addExternalUserToTags(result as ExternalUser);
-                              } else {
-                                addSuggestedToTags(result as User | RoleGroup);
-                              }
-                              setSearchQuery('');
-                              setInputValue('');
-                              setValidationError('');
-                            }}
-                            style={isAlreadyInvited ? { cursor: 'default' } : undefined}
-                          >
-                            <div className="flex items-center gap-3 flex-1 min-w-0">
-                              {isExternal ? (
-                                <>
-                                  <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/40 rounded-full flex items-center justify-center flex-shrink-0">
-                                    <UserPlus size={16} className="text-blue-600 dark:text-blue-400" />
+                  (() => {
+                    // Group results by category
+                    const groupedResults = {
+                      invited: searchResults.filter(result => (result as any).category === 'invited'),
+                      suggested: searchResults.filter(result => (result as any).category === 'suggested'),
+                      external: searchResults.filter(result => (result as any).category === 'external')
+                    };
+
+                    return (
+                      <div className="space-y-6">
+                        {/* Already Invited Section */}
+                        {groupedResults.invited.length > 0 && (
+                          <div>
+                            <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Already Invited</h3>
+                            <div className="grid grid-cols-1 gap-1">
+                              {groupedResults.invited.map((result) => {
+                                const isSelected = inviteTags.some(tag => tag.id === result.id);
+                                
+                                return (
+                                  <div 
+                                    key={result.id} 
+                                    className="flex items-center justify-between p-4 rounded-lg bg-gray-50 dark:bg-gray-700/50"
+                                    style={{ cursor: 'default' }}
+                                  >
+                                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                                      {'email' in result ? (
+                                        <>
+                                          <div className="w-10 h-10 bg-gray-200 dark:bg-gray-600 rounded-full flex items-center justify-center text-sm font-semibold text-gray-700 dark:text-gray-300 flex-shrink-0">
+                                            {result.name.charAt(0).toUpperCase()}
+                                          </div>
+                                          <div className="min-w-0 flex-1">
+                                            <div className="text-sm font-medium text-gray-900 dark:text-white truncate">{result.name}</div>
+                                            <div className="text-xs text-gray-500 dark:text-gray-400 truncate">{result.email}</div>
+                                          </div>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <div className="w-10 h-10 bg-gray-200 dark:bg-gray-600 rounded-full flex items-center justify-center flex-shrink-0">
+                                            <Users size={16} className="text-gray-600 dark:text-gray-400" />
+                                          </div>
+                                          <div className="min-w-0 flex-1">
+                                            <div className="text-sm font-medium text-gray-900 dark:text-white truncate">{result.name}</div>
+                                            <div className="text-xs text-gray-500 dark:text-gray-400">Group • {result.memberCount} person{result.memberCount !== 1 ? 's' : ''}</div>
+                                          </div>
+                                        </>
+                                      )}
+                                    </div>
+                                    <div className="flex-shrink-0 ml-3">
+                                      <select
+                                        value={result.permission}
+                                        onChange={(e) => {
+                                          const newPermission = e.target.value as PermissionOption;
+                                          if ('email' in result) {
+                                            handlePermissionChange(result.id, newPermission);
+                                          } else {
+                                            if (newPermission === 'Revoke') {
+                                              setRoleGroups(prev => prev.filter(g => g.id !== result.id));
+                                            } else {
+                                              handleGroupPermissionChange(result.id, newPermission as RoleGroup['permission']);
+                                            }
+                                          }
+                                        }}
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-600 focus:outline-none"
+                                      >
+                                        <option value="View-only">View-only</option>
+                                        <option value="Can edit">Can edit</option>
+                                        <option value="Full access">Full access</option>
+                                        <option value="Revoke" className="text-red-600">Revoke</option>
+                                      </select>
+                                    </div>
                                   </div>
-                                  <div className="min-w-0 flex-1">
-                                    <div className="text-sm font-medium text-gray-900 dark:text-white truncate">"{result.email}"</div>
-                                    <div className="text-xs text-gray-500 dark:text-gray-400">External user</div>
-                                  </div>
-                                </>
-                              ) : 'email' in result ? (
-                                <>
-                                  <div className="w-10 h-10 bg-gray-200 dark:bg-gray-600 rounded-full flex items-center justify-center text-sm font-semibold text-gray-700 dark:text-gray-300 flex-shrink-0">
-                                    {result.name.charAt(0).toUpperCase()}
-                                  </div>
-                                  <div className="min-w-0 flex-1">
-                                    <div className="text-sm font-medium text-gray-900 dark:text-white truncate">{result.name}</div>
-                                    <div className="text-xs text-gray-500 dark:text-gray-400 truncate">{result.email}</div>
-                                  </div>
-                                </>
-                              ) : (
-                                <>
-                                  <div className="w-10 h-10 bg-gray-200 dark:bg-gray-600 rounded-full flex items-center justify-center flex-shrink-0">
-                                    <Users size={16} className="text-gray-600 dark:text-gray-400" />
-                                  </div>
-                                  <div className="min-w-0 flex-1">
-                                    <div className="text-sm font-medium text-gray-900 dark:text-white truncate">{result.name}</div>
-                                    <div className="text-xs text-gray-500 dark:text-gray-400">Group • {result.memberCount} person{result.memberCount !== 1 ? 's' : ''}</div>
-                                  </div>
-                                </>
-                              )}
-                            </div>
-                            <div className="flex-shrink-0 ml-3">
-                              {isAlreadyInvited ? (
-                                <select
-                                  value={result.permission}
-                                  onChange={(e) => {
-                                    const newPermission = e.target.value as PermissionOption;
-                                    if ('email' in result) {
-                                      handlePermissionChange(result.id, newPermission);
-                                    } else {
-                                      if (newPermission === 'Revoke') {
-                                        setRoleGroups(prev => prev.filter(g => g.id !== result.id));
-                                      } else {
-                                        handleGroupPermissionChange(result.id, newPermission as RoleGroup['permission']);
-                                      }
-                                    }
-                                  }}
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-purple-600 focus:outline-none"
-                                >
-                                  <option value="View-only">View-only</option>
-                                  <option value="Can edit">Can edit</option>
-                                  <option value="Full access">Full access</option>
-                                  <option value="Revoke" className="text-red-600">Revoke</option>
-                                </select>
-                              ) : isExternal ? (
-                                <div className="w-6 h-6 text-gray-400 dark:text-gray-500 flex items-center justify-center">
-                                  <ArrowUpLeft size={16} />
-                                </div>
-                              ) : isSelected ? (
-                                <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
-                                  <Check size={14} className="text-white" />
-                                </div>
-                              ) : (
-                                <div className="w-6 h-6 border-2 border-gray-300 dark:border-gray-500 rounded-full"></div>
-                              )}
+                                );
+                              })}
                             </div>
                           </div>
-                        );
-                      })}
-                    </div>
-                  </div>
+                        )}
+
+                        {/* To be invited Section */}
+                        {groupedResults.suggested.length > 0 && (
+                          <div>
+                            <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">To be invited</h3>
+                            <div className="grid grid-cols-1 gap-1">
+                              {groupedResults.suggested.map((result) => {
+                                const isSelected = inviteTags.some(tag => tag.id === result.id);
+                                
+                                return (
+                                  <div 
+                                    key={result.id} 
+                                    className="flex items-center justify-between p-4 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors"
+                                    onClick={() => {
+                                      addSuggestedToTags(result as User | RoleGroup);
+                                      setSearchQuery('');
+                                      setInputValue('');
+                                      setValidationError('');
+                                    }}
+                                  >
+                                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                                      {'email' in result ? (
+                                        <>
+                                          <div className="w-10 h-10 bg-gray-200 dark:bg-gray-600 rounded-full flex items-center justify-center text-sm font-semibold text-gray-700 dark:text-gray-300 flex-shrink-0">
+                                            {result.name.charAt(0).toUpperCase()}
+                                          </div>
+                                          <div className="min-w-0 flex-1">
+                                            <div className="text-sm font-medium text-gray-900 dark:text-white truncate">{result.name}</div>
+                                            <div className="text-xs text-gray-500 dark:text-gray-400 truncate">{result.email}</div>
+                                          </div>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <div className="w-10 h-10 bg-gray-200 dark:bg-gray-600 rounded-full flex items-center justify-center flex-shrink-0">
+                                            <Users size={16} className="text-gray-600 dark:text-gray-400" />
+                                          </div>
+                                          <div className="min-w-0 flex-1">
+                                            <div className="text-sm font-medium text-gray-900 dark:text-white truncate">{result.name}</div>
+                                            <div className="text-xs text-gray-500 dark:text-gray-400">Group • {result.memberCount} person{result.memberCount !== 1 ? 's' : ''}</div>
+                                          </div>
+                                        </>
+                                      )}
+                                    </div>
+                                    <div className="flex-shrink-0 ml-3">
+                                      {isSelected ? (
+                                        <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                                          <Check size={14} className="text-white" />
+                                        </div>
+                                      ) : (
+                                        <div className="w-6 h-6 border-2 border-gray-300 dark:border-gray-500 rounded-full"></div>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* External User Section */}
+                        {groupedResults.external.length > 0 && (
+                          <div>
+                            <div className="grid grid-cols-1 gap-1">
+                              {groupedResults.external.map((result) => {
+                                const isSelected = inviteTags.some(tag => tag.id === result.id);
+                                
+                                return (
+                                  <div 
+                                    key={result.id} 
+                                    className="flex items-center justify-between p-4 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors"
+                                    onClick={() => {
+                                      addExternalUserToTags(result as ExternalUser);
+                                    }}
+                                  >
+                                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                                      <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/40 rounded-full flex items-center justify-center flex-shrink-0">
+                                        <UserPlus size={16} className="text-blue-600 dark:text-blue-400" />
+                                      </div>
+                                      <div className="min-w-0 flex-1">
+                                        <div className="text-sm font-medium text-gray-900 dark:text-white truncate">"{result.email}"</div>
+                                      </div>
+                                    </div>
+                                    <div className="flex-shrink-0 ml-3">
+                                      <div className="w-6 h-6 text-gray-400 dark:text-gray-500 flex items-center justify-center">
+                                        <ArrowUpLeft size={16} />
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()
                 ) : (
                   <div className="text-center py-8">
                     <div className="text-gray-500 dark:text-gray-400 text-sm">No matching users or groups found</div>
@@ -816,6 +891,7 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
                     {searchResults.map((result) => {
                       const isSelected = inviteTags.some(tag => tag.id === result.id);
                       const isExternal = 'type' in result && result.type === 'external';
+                      
                       return (
                         <div 
                           key={result.id} 
@@ -883,7 +959,7 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
                   <div className="text-gray-500 dark:text-gray-400 text-sm">No suggestions available</div>
                   <div className="text-gray-400 dark:text-gray-500 text-xs mt-1">All members from your teams already have access</div>
                 </div>
-              ))}
+              )}
             </div>
           ) : (
             // Share Mode Content
