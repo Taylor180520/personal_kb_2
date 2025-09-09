@@ -296,26 +296,33 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
           group.name.toLowerCase().includes(lowerCaseQuery)
         );
         setSearchResults([...userResults, ...groupResults]);
-      }
+      const allMatches = [...suggestedUserResults, ...suggestedGroupResults, ...invitedUserResults, ...invitedGroupResults];
       
-      // Check if the search query is a valid email that's not already in results
+      // If no matches found and the input looks like it could be an external user
       const trimmedQuery = searchQuery.trim();
-      if (isInviteMode && isValidEmail(trimmedQuery)) {
-        const emailExists = [
-          ...suggestedUsers,
-          ...users,
-          ...inviteTags.filter(tag => tag.email)
-        ].some(item => item.email?.toLowerCase() === trimmedQuery.toLowerCase());
+      
+      // Check if this could be an external user (email or potential username)
+      if (allMatches.length === 0 && trimmedQuery.length > 0) {
+        // Check if it's not already in invite tags
+        const alreadyInTags = inviteTags.some(tag => 
+          tag.email?.toLowerCase() === trimmedQuery.toLowerCase() ||
+          tag.name.toLowerCase() === trimmedQuery.toLowerCase()
+        );
         
-        if (!emailExists) {
+        if (!alreadyInTags) {
+          // Create external user entry
           const externalUser: ExternalUser = {
             id: `external-${trimmedQuery}`,
             email: trimmedQuery,
             name: trimmedQuery,
             type: 'external'
           };
-          setSearchResults(prev => [...prev, externalUser]);
+          setSearchResults([externalUser]);
+        } else {
+          setSearchResults([]);
         }
+      } else {
+        setSearchResults(allMatches);
       }
     } else {
       if (isInviteMode) {
