@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Search, X, ExternalLink, ChevronDown, ChevronRight, Users, ArrowLeft, UserPlus, Check, ChevronDown as ChevronDownIcon, ArrowRight, User } from 'lucide-react';
+import { Search, X, ExternalLink, ChevronDown, ChevronRight, Users, ArrowLeft, UserPlus, Check, ChevronDown as ChevronDownIcon, ArrowRight, User, ArrowUpLeft } from 'lucide-react';
 
 interface User {
   id: string;
@@ -736,7 +736,7 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
                               {isExternal ? (
                                 <>
                                   <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/40 rounded-full flex items-center justify-center flex-shrink-0">
-                                    <User size={16} className="text-blue-600 dark:text-blue-400" />
+                                    <UserPlus size={16} className="text-blue-600 dark:text-blue-400" />
                                   </div>
                                   <div className="min-w-0 flex-1">
                                     <div className="text-sm font-medium text-gray-900 dark:text-white truncate">"{result.email}"</div>
@@ -791,7 +791,7 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
                                 </select>
                               ) : isExternal ? (
                                 <div className="w-6 h-6 text-gray-400 dark:text-gray-500 flex items-center justify-center">
-                                  <ArrowRight size={16} />
+                                  <ArrowUpLeft size={16} />
                                 </div>
                               ) : isSelected ? (
                                 <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
@@ -839,7 +839,7 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
                             {isExternal ? (
                               <>
                                 <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/40 rounded-full flex items-center justify-center flex-shrink-0">
-                                  <User size={16} className="text-blue-600 dark:text-blue-400" />
+                                  <UserPlus size={16} className="text-blue-600 dark:text-blue-400" />
                                 </div>
                                 <div className="min-w-0 flex-1">
                                   <div className="text-sm font-medium text-gray-900 dark:text-white truncate">"{result.email}"</div>
@@ -871,7 +871,7 @@ const SharePermissionModal: React.FC<SharePermissionModalProps> = ({
                           <div className="flex-shrink-0 ml-3">
                             {isExternal ? (
                               <div className="w-6 h-6 text-gray-400 dark:text-gray-500 flex items-center justify-center">
-                                <ArrowRight size={16} />
+                                <ArrowUpLeft size={16} />
                               </div>
                             ) : isSelected ? (
                               <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
